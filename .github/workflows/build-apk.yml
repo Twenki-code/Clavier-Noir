@@ -18,32 +18,44 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Extract Android project
-        id: project
+      - name: Find and extract Android project
         shell: bash
         run: |
-          ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
+          set -e
+
+          ZIP_FILE="$(find . -type f -iname '*.zip' \
+            -not -path './.git/*' | head -n 1)"
+
           if [ -z "$ZIP_FILE" ]; then
-            echo "Tsy hita ilay ZIP."
+            echo "ERROR: Tsy nahita ZIP tao amin'ny repository."
             exit 1
           fi
 
+          echo "ZIP hita: $ZIP_FILE"
           mkdir -p source
-          unzip -q "$ZIP_FILE" -d source
+          unzip -o -q "$ZIP_FILE" -d source
 
           GRADLEW="$(find source -type f -name gradlew | head -n 1)"
+
           if [ -z "$GRADLEW" ]; then
-            echo "Tsy hita ny gradlew ao amin'ilay ZIP."
+            echo "ERROR: Tsy misy gradlew ao anatin'ny ZIP."
+            echo "Ireto ny rakitra Gradle hita:"
+            find source -maxdepth 5 -type f \
+              \( -name 'settings.gradle' -o \
+                 -name 'settings.gradle.kts' -o \
+                 -name 'gradlew' \)
             exit 1
           fi
 
-          PROJECT_DIR="$(dirname "$GRADLEW")"
-          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          echo "Projet hita: $(dirname "$GRADLEW")"
+          echo "PROJECT_DIR=$(dirname "$GRADLEW")" >> "$GITHUB_ENV"
 
-      - name: Build APK
+      - name: Build debug APK
+        shell: bash
         run: |
-          chmod +x "${{ steps.project.outputs.dir }}/gradlew"
-          cd "${{ steps.project.outputs.dir }}"
+          set -e
+          cd "$PROJECT_DIR"
+          chmod +x gradlew
           ./gradlew --no-daemon assembleDebug
 
       - name: Upload APK
