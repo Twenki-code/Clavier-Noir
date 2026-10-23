@@ -1,0 +1,55 @@
+
+name: Build Clavier Noir APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Get repository files
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Extract Android project
+        id: project
+        shell: bash
+        run: |
+          ZIP_FILE="$(find . -maxdepth 2 -type f -iname '*.zip' | head -n 1)"
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Tsy hita ilay ZIP."
+            exit 1
+          fi
+
+          mkdir -p source
+          unzip -q "$ZIP_FILE" -d source
+
+          GRADLEW="$(find source -type f -name gradlew | head -n 1)"
+          if [ -z "$GRADLEW" ]; then
+            echo "Tsy hita ny gradlew ao amin'ilay ZIP."
+            exit 1
+          fi
+
+          PROJECT_DIR="$(dirname "$GRADLEW")"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Build APK
+        run: |
+          chmod +x "${{ steps.project.outputs.dir }}/gradlew"
+          cd "${{ steps.project.outputs.dir }}"
+          ./gradlew --no-daemon assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Clavier-Noir-APK
+          path: source/**/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          
